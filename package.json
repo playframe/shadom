@@ -1,0 +1,35 @@
+{
+  "name": "@playframe/shadom",
+  "version": "1.0.0",
+  "description": "1.5 kB DOM + Shadow Manipulation",
+  "main": "index.js",
+  "scripts": {
+    "build": "coffee -c -b -p README.litcoffee > index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/playframe/shadom.git"
+  },
+  "keywords": [
+    "fp",
+    "pf",
+    "playframe",
+    "vdom",
+    "dom",
+    "virtual dom",
+    "shadow dom",
+    "shadow"
+  ],
+  "author": "Kiryl Yermakou <rma4ok@gmail.com>",
+  "license": "AGPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/playframe/shadom/issues"
+  },
+  "homepage": "https://github.com/playframe/shadom#readme",
+  "peerDependencies": {
+    "@playframe/h": "^1.0.0"
+  },
+  "devDependencies": {
+    "coffeescript": "^2.3.2"
+  }
+}
