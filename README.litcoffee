@@ -289,8 +289,9 @@ This function will create a new DOM element with its children
 
         if shadow_props = vnode[ATTR] and vnode[ATTR].attachShadow
           shadow = vnode[SHADOW] = el.attachShadow shadow_props
-          vnode.patch = (x, y)=>
-            mutate_children shadow, x, y, NS
+          vnode.patch = (vdom, old)=>
+            set_attr el, vdom[ATTR], vdom[ATTR], NS
+            mutate_children shadow, vdom, vdom, NS
             return
           mutate_children shadow, vnode, null, NS
         else
@@ -325,9 +326,8 @@ Removing element from its parent
 Comparing and setting attributes
 
     set_attr = (el, attr, old_attr, NS)=>
-      if old_attr
-        for k, old_v of old_attr when not attr[k]?
-          set el, k, null, old_v, NS
+      for k, old_v of old_attr when not (attr and attr[k]?)
+        set el, k, null, old_v, NS
 
       for k, v of attr
         old_v = if k in ['value', 'checked']

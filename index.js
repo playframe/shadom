@@ -310,8 +310,9 @@ make_el = (vnode, NS) => {
     set_attr(el, vnode[ATTR], null, NS);
     if (shadow_props = vnode[ATTR] && vnode[ATTR].attachShadow) {
       shadow = vnode[SHADOW] = el.attachShadow(shadow_props);
-      vnode.patch = (x, y) => {
-        mutate_children(shadow, x, y, NS);
+      vnode.patch = (vdom, old) => {
+        set_attr(el, vdom[ATTR], vdom[ATTR], NS);
+        mutate_children(shadow, vdom, vdom, NS);
       };
       mutate_children(shadow, vnode, null, NS);
     } else {
@@ -350,12 +351,10 @@ emmit_destroy = (vnode) => {
 // Comparing and setting attributes
 set_attr = (el, attr, old_attr, NS) => {
   var k, old_v, v;
-  if (old_attr) {
-    for (k in old_attr) {
-      old_v = old_attr[k];
-      if (attr[k] == null) {
-        set(el, k, null, old_v, NS);
-      }
+  for (k in old_attr) {
+    old_v = old_attr[k];
+    if (!(attr && (attr[k] != null))) {
+      set(el, k, null, old_v, NS);
     }
   }
   for (k in attr) {
