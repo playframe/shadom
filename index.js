@@ -248,8 +248,8 @@ mutate_children = (el, vnode, old_vnode, NS) => {
     child_el = el.childNodes[el_i];
     if (!by_key && (key || old_key)) {
       by_key = true; // switch to keyed mode
-      keyed = vnode[KEYED] = {};
       old_keyed = old_vnode && old_vnode[KEYED];
+      keyed = vnode[KEYED] = Object.create(null);
     }
     if (!(old_keyed && child && old_key !== key)) {
       // direct mutation unless key mismatch
@@ -305,29 +305,13 @@ mutate_children = (el, vnode, old_vnode, NS) => {
 // This function will create a new DOM element with its children
 make_el = (vnode, NS) => {
   var el, oncreate, shadow, shadow_props;
-  if (vnode[VNODE]) {
-    el = NS ? doc.createElementNS(NS, vnode[NAME]) : doc.createElement(vnode[NAME]);
-    set_attr(el, vnode[ATTR], null, NS);
-    if (shadow_props = vnode[ATTR] && vnode[ATTR].attachShadow) {
-      shadow = vnode[SHADOW] = el.attachShadow(shadow_props);
-      vnode.patch = (vdom, old) => {
-        set_attr(el, vdom[ATTR], vdom[ATTR], NS);
-        mutate_children(shadow, vdom, vdom, NS);
-      };
-      mutate_children(shadow, vnode, null, NS);
-    } else {
-      mutate_children(el, vnode, null, NS);
-    }
-    if (oncreate = vnode[ATTR] && vnode[ATTR].oncreate) {
-      // executed later but syncronously
-      _sync.render(() => {
-        return oncreate(el);
-      });
-    }
-    return el;
-  } else {
-    return doc.createTextNode(vnode);
-  }
+  return vnode[ELEMENT] || (vnode[VNODE] ? (el = NS ? doc.createElementNS(NS, vnode[NAME]) : doc.createElement(vnode[NAME]), set_attr(el, vnode[ATTR], null, NS), (shadow_props = vnode[ATTR] && vnode[ATTR].attachShadow) ? (vnode[ELEMENT] = el, shadow = vnode[SHADOW] = el.attachShadow(shadow_props), vnode.patch = (vdom, old) => {
+    set_attr(el, vdom[ATTR], old[ATTR], NS);
+    mutate_children(shadow, vdom, old, NS);
+  // executed later but syncronously
+  }, mutate_children(shadow, vnode, null, NS)) : mutate_children(el, vnode, null, NS), (oncreate = vnode[ATTR] && vnode[ATTR].oncreate) ? _sync.render(() => {
+    return oncreate(el);
+  }) : void 0, el) : doc.createTextNode(vnode));
 };
 
 // Removing element from its parent

@@ -228,8 +228,8 @@ Keyed updates are supported
 
         if not by_key and (key or old_key)
           by_key = true # switch to keyed mode
-          keyed = vnode[KEYED] = {}
           old_keyed = old_vnode and old_vnode[KEYED]
+          keyed = vnode[KEYED] = Object.create null
 
 
         unless old_keyed and child and old_key isnt key
@@ -279,7 +279,7 @@ Keyed updates are supported
 This function will create a new DOM element with its children
 
     make_el = (vnode, NS)=>
-      if vnode[VNODE]
+      vnode[ELEMENT] or if vnode[VNODE]
         el = if NS
           doc.createElementNS NS, vnode[NAME]
         else
@@ -288,10 +288,11 @@ This function will create a new DOM element with its children
         set_attr el, vnode[ATTR], null, NS
 
         if shadow_props = vnode[ATTR] and vnode[ATTR].attachShadow
+          vnode[ELEMENT] = el
           shadow = vnode[SHADOW] = el.attachShadow shadow_props
           vnode.patch = (vdom, old)=>
-            set_attr el, vdom[ATTR], vdom[ATTR], NS
-            mutate_children shadow, vdom, vdom, NS
+            set_attr el, vdom[ATTR], old[ATTR], NS
+            mutate_children shadow, vdom, old, NS
             return
           mutate_children shadow, vnode, null, NS
         else
