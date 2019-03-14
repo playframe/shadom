@@ -57,7 +57,6 @@ on the same object without any collision
     ELEMENT = Symbol 'ELEMENT'
     EVENTS = Symbol 'EVENTS'
     KEYED = Symbol 'KEYED'
-    SHADOW = Symbol 'SHADOW'
 
 
     _sync = null
@@ -104,13 +103,15 @@ DOM mutating
 Reusing preexisting html nodes in `root` element. This will benefit
 apps with server side pre-rendering
 
-    scan = (el)=>
+    scan = (el, NS)=>
+      NS = el.namespaceURI or NS
       if el.nodeType is 3 # text
         el.nodeValue
       else
         v_dom = h el.nodeName.toLowerCase(), null
-        {childNodes} = if shadowRoot = el.shadowRoot
-          v_dom[SHADOW] = shadowRoot
+        {childNodes} = if shadow = el.shadowRoot
+          v_dom.patch = patcher v_dom, el, shadow, NS
+          shadow
         else
           el
         for i in [0...childNodes.length] by 1
@@ -141,12 +142,12 @@ mutate `el`. `NS` is a XMLNS namespace for working with SVG or XHTML
             return new_el
 
           else # update node
-            set_attr el, vnode[ATTR], old_vnode[ATTR], NS
 
-            if shadow = old_vnode[SHADOW]
-              vnode[SHADOW] = shadow
-              mutate_children shadow, vnode, old_vnode, NS
+            if patch = old_vnode.patch
+              vnode.patch = patch
+              patch vnode
             else
+              set_attr el, vnode[ATTR], old_vnode[ATTR], NS
               mutate_children el, vnode, old_vnode, NS
 
             if onupdate = vnode[ATTR] and vnode[ATTR][if _first_run
@@ -275,7 +276,7 @@ Keyed updates are supported
 This function will create a new DOM element with its children
 
     make_el = (vnode, NS)=>
-      vnode[ELEMENT] or if vnode[VNODE]
+      if vnode[VNODE]
         el = if NS
           doc.createElementNS NS, vnode[NAME]
         else
@@ -284,12 +285,8 @@ This function will create a new DOM element with its children
         set_attr el, vnode[ATTR], null, NS
 
         if shadow_props = vnode[ATTR] and vnode[ATTR].attachShadow
-          vnode[ELEMENT] = el
-          shadow = vnode[SHADOW] = el.attachShadow shadow_props
-          vnode.patch = (vdom, old)=>
-            set_attr el, vdom[ATTR], old[ATTR], NS
-            mutate_children shadow, vdom, old, NS
-            return
+          shadow = el.attachShadow shadow_props
+          vnode.patch = patcher vnode, el, shadow, NS
           mutate_children shadow, vnode, null, NS
         else
           mutate_children el, vnode, null, NS
@@ -388,3 +385,12 @@ Comparing and setting attributes
 Getting a key from a virtual node
 
     get_key = (vnode)=> vnode and vnode[ATTR] and vnode[ATTR].key
+
+Creating a shadow DOM `patch` function 
+
+    patcher = (_old_vnode, el, shadow, NS)=>(vnode)=>
+      unless vnode is _old_vnode
+        set_attr el, vnode[ATTR], _old_vnode[ATTR], NS
+        mutate_children shadow, vnode, _old_vnode, NS
+        _old_vnode = vnode
+      return

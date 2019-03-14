@@ -34,7 +34,7 @@
 // constant. Symbol can't be created twice in two different places.
 // It is important to use the same instance of `@playframe/h` acroass
 // your app
-var ATTR, ELEMENT, EVENTS, FIRST_CHILD, KEYED, NAME, SHADOW, VNODE, _first_run, _sync, doc, emmit_remove, eventHandler, get_key, h, isArray, make_el, mutate_children, mutate_dom, remove_el, scan, set, set_attr;
+var ATTR, ELEMENT, EVENTS, FIRST_CHILD, KEYED, NAME, VNODE, _first_run, _sync, doc, emmit_remove, eventHandler, get_key, h, isArray, make_el, mutate_children, mutate_dom, patcher, remove_el, scan, set, set_attr;
 
 ({VNODE} = h = require('@playframe/h'));
 
@@ -60,8 +60,6 @@ ELEMENT = Symbol('ELEMENT');
 EVENTS = Symbol('EVENTS');
 
 KEYED = Symbol('KEYED');
-
-SHADOW = Symbol('SHADOW');
 
 _sync = null;
 
@@ -108,13 +106,14 @@ module.exports = (sync) => {
 
 // Reusing preexisting html nodes in `root` element. This will benefit
 // apps with server side pre-rendering
-scan = (el) => {
-  var childNodes, i, m, ref, shadowRoot, v_dom;
+scan = (el, NS) => {
+  var childNodes, i, m, ref, shadow, v_dom;
+  NS = el.namespaceURI || NS;
   if (el.nodeType === 3) { // text
     return el.nodeValue;
   } else {
     v_dom = h(el.nodeName.toLowerCase(), null);
-    ({childNodes} = (shadowRoot = el.shadowRoot) ? v_dom[SHADOW] = shadowRoot : el);
+    ({childNodes} = (shadow = el.shadowRoot) ? (v_dom.patch = patcher(v_dom, el, shadow, NS), shadow) : el);
     for (i = m = 0, ref = childNodes.length; m < ref; i = m += 1) {
       v_dom.push(scan(childNodes[i]));
     }
@@ -126,7 +125,7 @@ scan = (el) => {
 // Also it takes a new vDOM `vnode` and `old_vnode`. Their diff will
 // mutate `el`. `NS` is a XMLNS namespace for working with SVG or XHTML
 mutate_dom = (parent, el, vnode, old_vnode, NS) => {
-  var new_el, onupdate, ref, shadow;
+  var new_el, onupdate, patch, ref;
   // console.log 'mutate_dom', vnode, old_vnode
   if (vnode !== old_vnode) {
     if ((old_vnode != null) && (vnode != null) && !old_vnode[VNODE] && !vnode[VNODE]) {
@@ -148,11 +147,11 @@ mutate_dom = (parent, el, vnode, old_vnode, NS) => {
         }
         return new_el; // update node
       } else {
-        set_attr(el, vnode[ATTR], old_vnode[ATTR], NS);
-        if (shadow = old_vnode[SHADOW]) {
-          vnode[SHADOW] = shadow;
-          mutate_children(shadow, vnode, old_vnode, NS);
+        if (patch = old_vnode.patch) {
+          vnode.patch = patch;
+          patch(vnode);
         } else {
+          set_attr(el, vnode[ATTR], old_vnode[ATTR], NS);
           mutate_children(el, vnode, old_vnode, NS);
         }
         if (onupdate = vnode[ATTR] && vnode[ATTR][_first_run ? 'oncreate' : 'onupdate']) {
@@ -293,10 +292,23 @@ mutate_children = (el, vnode, old_vnode, NS) => {
 // This function will create a new DOM element with its children
 make_el = (vnode, NS) => {
   var el, oncreate, shadow, shadow_props;
-  return vnode[ELEMENT] || (vnode[VNODE] ? (el = NS ? doc.createElementNS(NS, vnode[NAME]) : doc.createElement(vnode[NAME]), set_attr(el, vnode[ATTR], null, NS), (shadow_props = vnode[ATTR] && vnode[ATTR].attachShadow) ? (vnode[ELEMENT] = el, shadow = vnode[SHADOW] = el.attachShadow(shadow_props), vnode.patch = (vdom, old) => {
-    set_attr(el, vdom[ATTR], old[ATTR], NS);
-    mutate_children(shadow, vdom, old, NS);
-  }, mutate_children(shadow, vnode, null, NS)) : mutate_children(el, vnode, null, NS), (oncreate = vnode[ATTR] && vnode[ATTR].oncreate) ? oncreate(el) : void 0, el) : doc.createTextNode(vnode));
+  if (vnode[VNODE]) {
+    el = NS ? doc.createElementNS(NS, vnode[NAME]) : doc.createElement(vnode[NAME]);
+    set_attr(el, vnode[ATTR], null, NS);
+    if (shadow_props = vnode[ATTR] && vnode[ATTR].attachShadow) {
+      shadow = el.attachShadow(shadow_props);
+      vnode.patch = patcher(vnode, el, shadow, NS);
+      mutate_children(shadow, vnode, null, NS);
+    } else {
+      mutate_children(el, vnode, null, NS);
+    }
+    if (oncreate = vnode[ATTR] && vnode[ATTR].oncreate) {
+      oncreate(el);
+    }
+    return el;
+  } else {
+    return doc.createTextNode(vnode);
+  }
 };
 
 // Removing element from its parent
@@ -392,4 +404,15 @@ set = (el, name, value, old_value, NS) => {
 // Getting a key from a virtual node
 get_key = (vnode) => {
   return vnode && vnode[ATTR] && vnode[ATTR].key;
+};
+
+// Creating a shadow DOM `patch` function 
+patcher = (_old_vnode, el, shadow, NS) => {
+  return (vnode) => {
+    if (vnode !== _old_vnode) {
+      set_attr(el, vnode[ATTR], _old_vnode[ATTR], NS);
+      mutate_children(shadow, vnode, _old_vnode, NS);
+      _old_vnode = vnode;
+    }
+  };
 };
