@@ -80,31 +80,25 @@ DOM mutating
     module.exports = (sync)=>(root)=>
       _sync = sync
 
-      _scheduled = false
-      _view = null
-      _state = null
       _v_dom = null
+      _new_v_dom = null
       if _dom = root.children[0]
         _v_dom = scan _dom
 
       render = =>
-        _scheduled = false
-        new_v_dom = _view _state
-        _dom = mutate_dom root, _dom, new_v_dom, _v_dom
-        _v_dom = new_v_dom
+        _dom = mutate_dom root, _dom, _new_v_dom, _v_dom
+        _v_dom = _new_v_dom
         return
 
       (view, state)=>
-        run = if _first_run # first run, render asap
-          (f)=> f(); _first_run = false; return
+        _new_v_dom = view state
+        
+        if _first_run # render asap
+          do render
+          _first_run = false
         else
-          _sync.render
+          _sync.render render
 
-        _view = view
-        _state = state
-        unless _scheduled
-          _scheduled = true
-          run render
         return
 
 Reusing preexisting html nodes in `root` element. This will benefit
@@ -114,10 +108,13 @@ apps with server side pre-rendering
       if el.nodeType is 3 # text
         el.nodeValue
       else
-        {childNodes} = el
-        nodes = h el.nodeName.toLowerCase(), null
+        v_dom = h el.nodeName.toLowerCase(), null
+        {childNodes} = if shadowRoot = el.shadowRoot
+          v_dom[SHADOW] = shadowRoot
+        else
+          el
         for i in [0...childNodes.length] by 1
-          nodes.push scan childNodes[i]
+          v_dom.push scan childNodes[i]
         nodes
 
 This function will take a DOM element `el` and its `parent` element.
@@ -140,7 +137,7 @@ mutate `el`. `NS` is a XMLNS namespace for working with SVG or XHTML
               parent.insertBefore new_el, el
             if old_vnode?
               remove_el parent, el
-              _sync.next => emmit_destroy old_vnode
+              _sync.next => emmit_remove old_vnode
             return new_el
 
           else # update node
@@ -156,8 +153,7 @@ mutate `el`. `NS` is a XMLNS namespace for working with SVG or XHTML
                 'oncreate'
               else 'onupdate'
             ]
-              # executed syncronously later
-              _sync.render => onupdate el
+              onupdate el
       el
 
 This function will compare and mutate children of given `el`.
@@ -250,12 +246,12 @@ Keyed updates are supported
           if old_child
             remove_el el, child_el
             if old_key
-              # destroy if not reused
-              _sync.next do (old_key)=>=> # old_key closure
+              # emit remove if not reused
+              _sync.render do (old_key)=>=> # old_key closure
                 if old_keyed[old_key]
-                  emmit_destroy old_keyed[old_key]
+                  emmit_remove old_keyed[old_key]
             else
-              emmit_destroy old_child
+              emmit_remove old_child
 
           child_el = replaced_el
 
@@ -299,8 +295,7 @@ This function will create a new DOM element with its children
           mutate_children el, vnode, null, NS
 
         if oncreate = vnode[ATTR] and vnode[ATTR].oncreate
-          # executed later but syncronously
-          _sync.render => oncreate el
+          oncreate el
 
         el
       else
@@ -313,15 +308,15 @@ Removing element from its parent
       return
 
 
-    emmit_destroy = (vnode)=>
+    emmit_remove = (vnode)=>
       {length} = vnode
 
       while length-- > 0
         if isArray child = vnode[length]
-          emmit_destroy child
+          emmit_remove child
 
-      if ondestroy = vnode[ATTR] and vnode[ATTR].ondestroy
-        ondestroy()
+      if onremove = vnode[ATTR] and vnode[ATTR].onremove
+        onremove()
       return
 
 Comparing and setting attributes

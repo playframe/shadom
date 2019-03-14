@@ -34,7 +34,7 @@
 // constant. Symbol can't be created twice in two different places.
 // It is important to use the same instance of `@playframe/h` acroass
 // your app
-var ATTR, ELEMENT, EVENTS, FIRST_CHILD, KEYED, NAME, SHADOW, VNODE, _first_run, _sync, doc, emmit_destroy, eventHandler, get_key, h, isArray, make_el, mutate_children, mutate_dom, remove_el, scan, set, set_attr;
+var ATTR, ELEMENT, EVENTS, FIRST_CHILD, KEYED, NAME, SHADOW, VNODE, _first_run, _sync, doc, emmit_remove, eventHandler, get_key, h, isArray, make_el, mutate_children, mutate_dom, remove_el, scan, set, set_attr;
 
 ({VNODE} = h = require('@playframe/h'));
 
@@ -83,33 +83,24 @@ eventHandler = (event) => {
 // DOM mutating
 module.exports = (sync) => {
   return (root) => {
-    var _dom, _scheduled, _state, _v_dom, _view, render;
+    var _dom, _new_v_dom, _v_dom, render;
     _sync = sync;
-    _scheduled = false;
-    _view = null;
-    _state = null;
     _v_dom = null;
+    _new_v_dom = null;
     if (_dom = root.children[0]) {
       _v_dom = scan(_dom);
     }
     render = () => {
-      var new_v_dom;
-      _scheduled = false;
-      new_v_dom = _view(_state);
-      _dom = mutate_dom(root, _dom, new_v_dom, _v_dom);
-      _v_dom = new_v_dom;
+      _dom = mutate_dom(root, _dom, _new_v_dom, _v_dom);
+      _v_dom = _new_v_dom;
     };
     return (view, state) => {
-      var run;
-      run = _first_run ? (f) => { // first run, render asap
-        f();
+      _new_v_dom = view(state);
+      if (_first_run) { // render asap
+        render();
         _first_run = false;
-      } : _sync.render;
-      _view = view;
-      _state = state;
-      if (!_scheduled) {
-        _scheduled = true;
-        run(render);
+      } else {
+        _sync.render(render);
       }
     };
   };
@@ -118,14 +109,14 @@ module.exports = (sync) => {
 // Reusing preexisting html nodes in `root` element. This will benefit
 // apps with server side pre-rendering
 scan = (el) => {
-  var childNodes, i, m, nodes, ref;
+  var childNodes, i, m, ref, shadowRoot, v_dom;
   if (el.nodeType === 3) { // text
     return el.nodeValue;
   } else {
-    ({childNodes} = el);
-    nodes = h(el.nodeName.toLowerCase(), null);
+    v_dom = h(el.nodeName.toLowerCase(), null);
+    ({childNodes} = (shadowRoot = el.shadowRoot) ? v_dom[SHADOW] = shadowRoot : el);
     for (i = m = 0, ref = childNodes.length; m < ref; i = m += 1) {
-      nodes.push(scan(childNodes[i]));
+      v_dom.push(scan(childNodes[i]));
     }
     return nodes;
   }
@@ -152,7 +143,7 @@ mutate_dom = (parent, el, vnode, old_vnode, NS) => {
         if (old_vnode != null) {
           remove_el(parent, el);
           _sync.next(() => {
-            return emmit_destroy(old_vnode);
+            return emmit_remove(old_vnode);
           });
         }
         return new_el; // update node
@@ -165,10 +156,7 @@ mutate_dom = (parent, el, vnode, old_vnode, NS) => {
           mutate_children(el, vnode, old_vnode, NS);
         }
         if (onupdate = vnode[ATTR] && vnode[ATTR][_first_run ? 'oncreate' : 'onupdate']) {
-          // executed syncronously later
-          _sync.render(() => {
-            return onupdate(el);
-          });
+          onupdate(el);
         }
       }
     }
@@ -267,16 +255,16 @@ mutate_children = (el, vnode, old_vnode, NS) => {
       if (old_child) {
         remove_el(el, child_el);
         if (old_key) {
-          // destroy if not reused
-          _sync.next(((old_key) => {
+          // emit remove if not reused
+          _sync.render(((old_key) => {
             return () => { // old_key closure
               if (old_keyed[old_key]) {
-                return emmit_destroy(old_keyed[old_key]);
+                return emmit_remove(old_keyed[old_key]);
               }
             };
           })(old_key));
         } else {
-          emmit_destroy(old_child);
+          emmit_remove(old_child);
         }
       }
       child_el = replaced_el;
@@ -308,10 +296,7 @@ make_el = (vnode, NS) => {
   return vnode[ELEMENT] || (vnode[VNODE] ? (el = NS ? doc.createElementNS(NS, vnode[NAME]) : doc.createElement(vnode[NAME]), set_attr(el, vnode[ATTR], null, NS), (shadow_props = vnode[ATTR] && vnode[ATTR].attachShadow) ? (vnode[ELEMENT] = el, shadow = vnode[SHADOW] = el.attachShadow(shadow_props), vnode.patch = (vdom, old) => {
     set_attr(el, vdom[ATTR], old[ATTR], NS);
     mutate_children(shadow, vdom, old, NS);
-  // executed later but syncronously
-  }, mutate_children(shadow, vnode, null, NS)) : mutate_children(el, vnode, null, NS), (oncreate = vnode[ATTR] && vnode[ATTR].oncreate) ? _sync.render(() => {
-    return oncreate(el);
-  }) : void 0, el) : doc.createTextNode(vnode));
+  }, mutate_children(shadow, vnode, null, NS)) : mutate_children(el, vnode, null, NS), (oncreate = vnode[ATTR] && vnode[ATTR].oncreate) ? oncreate(el) : void 0, el) : doc.createTextNode(vnode));
 };
 
 // Removing element from its parent
@@ -319,16 +304,16 @@ remove_el = (parent, el) => {
   parent.removeChild(el);
 };
 
-emmit_destroy = (vnode) => {
-  var child, length, ondestroy;
+emmit_remove = (vnode) => {
+  var child, length, onremove;
   ({length} = vnode);
   while (length-- > 0) {
     if (isArray(child = vnode[length])) {
-      emmit_destroy(child);
+      emmit_remove(child);
     }
   }
-  if (ondestroy = vnode[ATTR] && vnode[ATTR].ondestroy) {
-    ondestroy();
+  if (onremove = vnode[ATTR] && vnode[ATTR].onremove) {
+    onremove();
   }
 };
 
