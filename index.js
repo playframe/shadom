@@ -117,7 +117,7 @@ scan = (el, NS) => {
     for (i = m = 0, ref = childNodes.length; m < ref; i = m += 1) {
       v_dom.push(scan(childNodes[i]));
     }
-    return nodes;
+    return v_dom;
   }
 };
 

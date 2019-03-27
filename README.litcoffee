@@ -116,7 +116,7 @@ apps with server side pre-rendering
           el
         for i in [0...childNodes.length] by 1
           v_dom.push scan childNodes[i]
-        nodes
+        v_dom
 
 This function will take a DOM element `el` and its `parent` element.
 Also it takes a new vDOM `vnode` and `old_vnode`. Their diff will
