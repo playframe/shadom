@@ -217,8 +217,7 @@ Keyed updates are supported
                 sub_j = sub_jl = 0
                 j++
 
-
-        break unless child or old_child
+        break unless child? or old_child?
 
         child_el = el.childNodes[el_i]
 
