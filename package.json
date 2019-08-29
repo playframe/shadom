@@ -1,6 +1,6 @@
 {
   "name": "@playframe/shadom",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "1.5 kB DOM + Shadow Manipulation",
   "main": "index.js",
   "scripts": {
@@ -30,6 +30,6 @@
     "@playframe/h": "^1.0.0"
   },
   "devDependencies": {
-    "coffeescript": "^2.3.2"
+    "coffeescript": "^2.4.1"
   }
 }
