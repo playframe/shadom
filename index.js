@@ -65,14 +65,9 @@ _sync = null;
 
 _first_run = true;
 
-// This function will schedule actual event handling at
-// the begging of the next work batch
+// This function will handle event dispatching
 eventHandler = (event) => {
-  var f;
-  f = event.currentTarget[EVENTS][event.type];
-  _sync.next(() => {
-    return f(event);
-  });
+  event.currentTarget[EVENTS][event.type](event);
 };
 
 // We are exporting a higher order function that will take `sync` scheduler

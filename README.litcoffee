@@ -62,12 +62,10 @@ on the same object without any collision
     _sync = null
     _first_run = true
 
-This function will schedule actual event handling at
-the begging of the next work batch
+This function will handle event dispatching
 
     eventHandler = (event)=>
-      f = event.currentTarget[EVENTS][event.type]
-      _sync.next => f event
+      event.currentTarget[EVENTS][event.type] event
       return
 
 
